@@ -9,10 +9,12 @@ TL;DR
 * use GitHub forks and pull requests, but do NOT merge to "master" branch
     * use development or feature branches instead
 * put release notes into WHATSNEW.txt
-* tag release with "v<version_number>", e.g. "v1.0.1"
+* tag public versions with tags including the version number
+    * beta releases with "v<version_number>-beta.n", e.g. "v1.1.0-beta10"
+    * official releases with "v<version_number>", e.g. "v1.0.1"
 * NuGet package is automatically built by AppVeyor 
 * publish NuGet package from AppVeyor to nuget.org
-* merge release tag to master branch
+* merge official release tag to master branch
 
 Comprehensive
 -------------
