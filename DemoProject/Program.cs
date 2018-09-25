@@ -22,7 +22,7 @@ namespace DemoProject
                 {
                     Name = "Char1",
                     Value = 0.16,
-                    Attributes =
+                    Attributes = new Dictionary<string, double>()
                     {
                         {"LowerTolerance", -0.2},
                         {"UpperTolerance", -0.2},
@@ -34,7 +34,7 @@ namespace DemoProject
                 {
                     Name = "Char2",
                     Value = 0.21,
-                    Attributes =
+                    Attributes = new Dictionary<string, double>()
                     {
                         {"LowerTolerance", -0.4},
                         {"UpperTolerance", -0.4},
@@ -46,7 +46,7 @@ namespace DemoProject
                 {
                     Name = "Char3",
                     Value = 0.34,
-                    Attributes =
+                    Attributes = new Dictionary<string, double>()
                     {
                         {"LowerTolerance", -0.3},
                         {"UpperTolerance", -0.3},
@@ -84,6 +84,45 @@ namespace DemoProject
             Configuration.CheckAttribute(client, Entity.Measurement, WellKnownKeys.Measurement.Time, "Time", AttributeType.DateTime);
             Configuration.CheckAttribute(client, Entity.Value, WellKnownKeys.Measurement.Time, "Value", AttributeType.Float);
 
+
+            // 3. check inspection plan
+            var part = InspectionPlan.GetOrCreatePart(client, inspectionName);
+            var characteristicMapping = new Dictionary<Characteristic, InspectionPlanCharacteristic>();
+
+            foreach (var characteristic in data)
+            {
+                var inspectionPlanCharacteristic = InspectionPlan.GetOrCreateCharacteristic(client, part.Path.Name,
+                    characteristic.Name, mapping, characteristic.Attributes);
+                characteristicMapping.Add(characteristic, inspectionPlanCharacteristic);
+            }
+
+            // 4. create measurements
+            var dataCharacteristics = characteristicMapping.Select(pair => new DataCharacteristic
+            {
+                Uuid = pair.Value.Uuid,
+                Path = pair.Value.Path,
+                Value = new DataValue
+                {
+                    Attributes = new[]
+                    {
+                        new Zeiss.IMT.PiWeb.Api.DataService.Rest.Attribute(WellKnownKeys.Value.MeasuredValue, pair.Key.Value),
+                    }
+                }
+            }).ToArray();
+
+            var measurement = new DataMeasurement
+            {
+                Uuid = Guid.NewGuid(),
+                PartUuid = part.Uuid,
+                Time = DateTime.UtcNow,
+                Attributes = new[]
+                {
+                    new Zeiss.IMT.PiWeb.Api.DataService.Rest.Attribute(WellKnownKeys.Measurement.Time, DateTime.UtcNow)
+                },
+                Characteristics = dataCharacteristics
+            };
+
+            // 4.1. finally we write measurement to database
         }
 
     }

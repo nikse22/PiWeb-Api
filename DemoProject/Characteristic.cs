@@ -10,7 +10,7 @@ namespace DemoProject
     {
         public string Name { get; set; }
         public double Value { get; set; }
-        public Dictionary<string, object> Attributes { get; set; }
+        public Dictionary<string, double> Attributes { get; set; }
     }
 
 }

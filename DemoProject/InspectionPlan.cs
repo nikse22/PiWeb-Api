@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Zeiss.IMT.PiWeb.Api.Common.Data;
 using Zeiss.IMT.PiWeb.Api.DataService.Rest;
+using Attribute = Zeiss.IMT.PiWeb.Api.DataService.Rest.Attribute;
 
 namespace DemoProject
 {
@@ -18,11 +19,11 @@ namespace DemoProject
             {
                 existingPart = new InspectionPlanPart
                 {
-                    Path = PathHelper.String2CharPathInformation(name),
+                    Path = PathHelper.String2PartPathInformation(name),
                     Uuid = Guid.NewGuid()
                 };
 
-                client.CreateParts(new[]
+                client.CreateParts( new[]
                 {
                     existingPart
                 }).Wait();
@@ -32,7 +33,7 @@ namespace DemoProject
         }
 
         public static InspectionPlanCharacteristic GetOrCreateCharacteristic(DataServiceRestClient client,
-            string partName, string characteristicName, Dictionary<string, ushort> mapping, Dictionary<string, object> values)
+            string partName, string characteristicName, Dictionary<string, ushort> mapping, Dictionary<string, double> values)
         {
             var characteristics = client.GetCharacteristics(PathHelper.String2PartPathInformation(partName), 1).Result;
             var attributes = values.Select(pair => new Attribute(mapping[pair.Key], pair.Value)).ToArray();
@@ -43,7 +44,7 @@ namespace DemoProject
             {
                 existingCharacteristic = new InspectionPlanCharacteristic
                 {
-                    Path = PathHelper.String2PathInformation(partName + "/" + characteristicName, "PC"),
+                    Path = PathHelper.String2PathInformation("/" + partName + "/" + characteristicName + "/", "PC"),
                     Uuid = Guid.NewGuid(),
                     Attributes = attributes
                 };
@@ -56,6 +57,7 @@ namespace DemoProject
             else
             {
                 existingCharacteristic.Attributes = attributes;
+
                 // maybe update the characteristics so the attributes are up to date
                 client.UpdateCharacteristics(new[]
                 {
@@ -63,8 +65,8 @@ namespace DemoProject
                 }).Wait();
             }
 
+            return existingCharacteristic;
         }
-
 
     }
 }
