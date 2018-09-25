@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IdentityModel" Version="3.9.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Clients.ActiveDirectory" Version="3.19.8" />
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="5.2.4" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="4.5.0" />
+    <PackageReference Include="System.Security.Cryptography.X509Certificates" Version="4.3.2" />
+    <PackageReference Include="System.ServiceModel.Primitives" Version="4.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Common\Data\SearchConditionParser.de.resx">
+      <DependentUpon>SearchConditionParser.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Common\Data\SearchConditionParser.resx">
+      <DependentUpon>SearchConditionParser.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="DataService\Rest\AttributeType.de.resx">
+      <DependentUpon>AttributeType.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="DataService\Rest\AttributeType.resx">
+      <DependentUpon>AttributeType.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="DataService\Rest\Entity.de.resx">
+      <DependentUpon>Entity.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="DataService\Rest\Entity.resx">
+      <DependentUpon>Entity.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="DataService\Rest\FieldType.de.resx">
+      <DependentUpon>FieldType.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="DataService\Rest\FieldType.resx">
+      <DependentUpon>FieldType.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="DataService\Rest\Operation.de.resx">
+      <DependentUpon>Operation.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="DataService\Rest\Operation.resx">
+      <DependentUpon>Operation.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
