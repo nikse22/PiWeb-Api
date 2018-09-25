@@ -79,6 +79,11 @@ namespace DemoProject
                 Configuration.CheckAttribute(client, Entity.Characteristic, entry.Value, entry.Key,
                     AttributeType.Float);
             }
+
+            // Make sure that essential attributes do exist
+            Configuration.CheckAttribute(client, Entity.Measurement, WellKnownKeys.Measurement.Time, "Time", AttributeType.DateTime);
+            Configuration.CheckAttribute(client, Entity.Value, WellKnownKeys.Measurement.Time, "Value", AttributeType.Float);
+
         }
 
     }

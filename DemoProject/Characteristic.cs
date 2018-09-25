@@ -8,10 +8,10 @@ namespace DemoProject
 {
     class Characteristic
     {
-            public string Name { get; set; }
-            public double Value { get; set; }
-            public Dictionary<string, object> Attributes { get; set; }
-        }
-
+        public string Name { get; set; }
+        public double Value { get; set; }
+        public Dictionary<string, object> Attributes { get; set; }
     }
+
 }
+
