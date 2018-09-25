@@ -11,7 +11,7 @@ namespace DemoProject
     class Program
     {
 
-        private static Uri _ServerUri = new Uri("http://IV05N001FB.cznet.zeiss.org:8080/");
+        private static Uri _ServerUri = new Uri("http://localhost:8080/");
 
         static void Main(string[] args)
         {
@@ -72,6 +72,7 @@ namespace DemoProject
         {
             // 1. create the client 
             var client = new DataServiceRestClient(_ServerUri);
+
 
             // 2. check server configuration
             foreach (var entry in mapping)
