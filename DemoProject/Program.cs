@@ -4,13 +4,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Zeiss.IMT.PiWeb.Api.Common.Data;
+using Zeiss.IMT.PiWeb.Api.DataService.Rest;
 
 namespace DemoProject
 {
     class Program
     {
 
-        private static Uri ServerUri = new Uri("http://IV05N001FB.cznet.zeiss.org:8080/");
+        private static Uri _ServerUri = new Uri("http://IV05N001FB.cznet.zeiss.org:8080/");
 
         static void Main(string[] args)
         {
@@ -54,10 +55,32 @@ namespace DemoProject
 
                 }
             };
+
+            var mapping = new Dictionary<string, ushort>
+            {
+                {"LowerTolerance", 2110},
+                {"UpperTolerance", 2111},
+                {"NominalValue", 2101}
+            };
+
+            Import("MyInspection", characteristics, mapping);
+
         }
+
+        private static void Import(string inspectionName, IEnumerable<Characteristic> data,
+            Dictionary<string, ushort> mapping)
+        {
+            // 1. create the client 
+            var client = new DataServiceRestClient(_ServerUri);
+
+            // 2. check server configuration
+            foreach (var entry in mapping)
+            {
+                Configuration.CheckAttribute(client, Entity.Characteristic, entry.Value, entry.Key,
+                    AttributeType.Float);
+            }
+        }
+
     }
-
-
-
 
 }
