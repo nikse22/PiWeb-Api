@@ -20,51 +20,51 @@ namespace DemoProject
                 using (var rawClient = new RawDataServiceRestClient(_ServerUri))
                 {
 
-                    var charcateristics = new List<Characteristic>
-                    {
-                        new Characteristic
-                        {
-                            Name = "Char1",
-                            Value = 0.16,
-                            Attributes = new Dictionary<string, double>
-                            {
-                                { "LowerTolerance", -0.2 },
-                                { "UpperTolerance", 0.2 },
-                                { "NominalValue", 0.0 }
-                            }
-                        },
-                        new Characteristic
-                        {
-                            Name = "Char2",
-                            Value = 0.21,
-                            Attributes = new Dictionary<string, double>
-                            {
-                                { "LowerTolerance", -0.2 },
-                                { "UpperTolerance", 0.2 },
-                                { "NominalValue", 0.0 }
-                            }
-                        },
-                        new Characteristic
-                        {
-                            Name = "Char3",
-                            Value = 0.22,
-                            Attributes = new Dictionary<string, double>
-                            {
-                                { "LowerTolerance", -0.2 },
-                                { "UpperTolerance", 0.2 },
-                                { "NominalValue", 0.0 }
-                            }
-                        }
-                    };
+                    //var charcateristics = new List<Characteristic>
+                    //{
+                    //    new Characteristic
+                    //    {
+                    //        Name = "Char1",
+                    //        Value = 0.16,
+                    //        Attributes = new Dictionary<string, double>
+                    //        {
+                    //            { "LowerTolerance", -0.2 },
+                    //            { "UpperTolerance", 0.2 },
+                    //            { "NominalValue", 0.0 }
+                    //        }
+                    //    },
+                    //    new Characteristic
+                    //    {
+                    //        Name = "Char2",
+                    //        Value = 0.21,
+                    //        Attributes = new Dictionary<string, double>
+                    //        {
+                    //            { "LowerTolerance", -0.2 },
+                    //            { "UpperTolerance", 0.2 },
+                    //            { "NominalValue", 0.0 }
+                    //        }
+                    //    },
+                    //    new Characteristic
+                    //    {
+                    //        Name = "Char3",
+                    //        Value = 0.22,
+                    //        Attributes = new Dictionary<string, double>
+                    //        {
+                    //            { "LowerTolerance", -0.2 },
+                    //            { "UpperTolerance", 0.2 },
+                    //            { "NominalValue", 0.0 }
+                    //        }
+                    //    }
+                    //};
 
-                    var mapping = new Dictionary<string, ushort>
-                    {
-                        { "LowerTolerance", 2110 },
-                        { "UpperTolerance", 2111 },
-                        { "NominalValue", 2101 }
-                    };
+                    //var mapping = new Dictionary<string, ushort>
+                    //{
+                    //    { "LowerTolerance", 2110 },
+                    //    { "UpperTolerance", 2111 },
+                    //    { "NominalValue", 2101 }
+                    //};
 
-                    Import(client, rawClient, "MyInspection", charcateristics, mapping);
+                    //Import(client, rawClient, "MyInspection", charcateristics, mapping);
 
                     var parts = SearchForParts(client);
 
@@ -78,15 +78,8 @@ namespace DemoProject
         private static IEnumerable<InspectionPlanPart> SearchForParts(DataServiceRestClient client)
         {
             //Filtering parts by attributes happen on client not on server side!!
-            var result = client.GetParts(
-                PathInformation.Root,                               // Part to be fetched by its path
-                new[] { Guid.NewGuid(), Guid.NewGuid() },               // Parts to be fetched by its uuids
-                1,                                                  // Determines how many levels of the inspection plan tree 
-                                                                    //hierarchy should be fetched. Setting depth=0 means that only the entity itself should be fetched, 
-                                                                    //depth=1 means the entity and its direct children should be fetched. Please note that depth is treated relative of the path depth of the provided part.
-                new AttributeSelector(AllAttributeSelection.True),  //Restricts the result to certain attributes
-                false                                               // Determines whether the version history should be fetched or not. This only effects the query if versioning is activated on the server side. 
-            ).Result;
+            var result = client.GetParts(PathInformation.Root, null, null, null, false).Result;
+            
 
             return result;
         }
@@ -95,12 +88,9 @@ namespace DemoProject
         {
             //1. Fetch information about raw data values that exist for the given measurements
             var informationList = new List<RawDataInformation>();
-            foreach (var measurement in measurements)
-            {
-                var target = RawDataTargetEntity.CreateForMeasurement(measurement.Uuid);
-                var rawDataInformation = rawClient.ListRawData(new[] { target }).Result;
-                informationList.AddRange(rawDataInformation);
-            }
+            
+            var rawDataInformations = rawClient.ListRawData(RawDataEntity.Measurement, measurements.Select(p => p.Uuid.ToString()).ToArray(), null).Result;
+            informationList.AddRange(rawDataInformations);
 
             //2. Fetch all the attached files and write it to the disk
             string tempPath = @"C:\Temp\";
@@ -121,20 +111,15 @@ namespace DemoProject
                     Deep = true,                                                   // A deep search will find measurements recursively below the start path
                     FromModificationDate = null,                                   // Will only search measurements with a modification date (LastModified) newer than the specified one
                     ToModificationDate = null,                                     // Will only search measurements with a modification date (LastModified) older than the specified one
-                    LimitResult = 10,                                              // Will limit the number of returned measurements
+                    //LimitResult = 10,                                              // Will limit the number of returned measurements
                     MeasurementUuids = null,                                       // Use measurement uuids to search for specific measurements
                     OrderBy = new[]                                                // Order the returned measurements by specific attributes
 					{
                         new Order( WellKnownKeys.Measurement.Time, OrderDirection.Asc, Entity.Measurement )
                     },
-                    PartUuids = parts.Select(p => p.Uuid).ToArray(),                //Restrict the search to certain parts by its uuids
-                    RequestedMeasurementAttributes = null,                         // Specify, which measurement attributes should be returned (default: all)
-                    SearchCondition = new GenericSearchAttributeCondition          // You can create more complex attribute conditions using the GenericSearchAnd, GenericSearchOr and GenericSearchNot class
-                    {
-                        Attribute = WellKnownKeys.Measurement.Time,                //Only measurement attributes are supported
-                        Operation = Operation.GreaterThan,
-                        Value = XmlConvert.ToString(DateTime.UtcNow - TimeSpan.FromDays(2), XmlDateTimeSerializationMode.Utc)
-                    }
+                    //PartUuids = parts.Select(p => p.Uuid).ToArray(),                //Restrict the search to certain parts by its uuids
+                    //RequestedMeasurementAttributes = null,                         // Specify, which measurement attributes should be returned (default: all)
+                    
                 }).Result;
 
             return result;
