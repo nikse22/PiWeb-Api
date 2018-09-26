@@ -11,64 +11,107 @@ namespace DemoProject
 {
     class Program
     {
-        private static Uri _ServerUri = new Uri("http://DEDRSWH5LWQF2.izfmnet.zeiss.org:8080/");
+        private static Uri _ServerUri = new Uri("http://localhost:8080/");
 
         static void Main(string[] args)
         {
             using (var client = new DataServiceRestClient(_ServerUri))
             {
-
-                var charcateristics = new List<Characteristic>
+                using (var rawClient = new RawDataServiceRestClient(_ServerUri))
                 {
-                    new Characteristic
-                    {
-                        Name = "Char1",
-                        Value = 0.16,
-                        Attributes = new Dictionary<string, double>
-                        {
-                            { "LowerTolerance", -0.2 },
-                            { "UpperTolerance", 0.2 },
-                            { "NominalValue", 0.0 }
-                        }
-                    },
-                    new Characteristic
-                    {
-                        Name = "Char2",
-                        Value = 0.21,
-                        Attributes = new Dictionary<string, double>
-                        {
-                            { "LowerTolerance", -0.2 },
-                            { "UpperTolerance", 0.2 },
-                            { "NominalValue", 0.0 }
-                        }
-                    },
-                    new Characteristic
-                    {
-                        Name = "Char3",
-                        Value = 0.22,
-                        Attributes = new Dictionary<string, double>
-                        {
-                            { "LowerTolerance", -0.2 },
-                            { "UpperTolerance", 0.2 },
-                            { "NominalValue", 0.0 }
-                        }
-                    }
-                };
 
-                var mapping = new Dictionary<string, ushort>
-                {
-                    { "LowerTolerance", 2110 },
-                    { "UpperTolerance", 2111 },
-                    { "NominalValue", 2101 }
-                };
+                    var charcateristics = new List<Characteristic>
+                    {
+                        new Characteristic
+                        {
+                            Name = "Char1",
+                            Value = 0.16,
+                            Attributes = new Dictionary<string, double>
+                            {
+                                { "LowerTolerance", -0.2 },
+                                { "UpperTolerance", 0.2 },
+                                { "NominalValue", 0.0 }
+                            }
+                        },
+                        new Characteristic
+                        {
+                            Name = "Char2",
+                            Value = 0.21,
+                            Attributes = new Dictionary<string, double>
+                            {
+                                { "LowerTolerance", -0.2 },
+                                { "UpperTolerance", 0.2 },
+                                { "NominalValue", 0.0 }
+                            }
+                        },
+                        new Characteristic
+                        {
+                            Name = "Char3",
+                            Value = 0.22,
+                            Attributes = new Dictionary<string, double>
+                            {
+                                { "LowerTolerance", -0.2 },
+                                { "UpperTolerance", 0.2 },
+                                { "NominalValue", 0.0 }
+                            }
+                        }
+                    };
 
-                Import(client, "MyInspection", charcateristics, mapping);
+                    var mapping = new Dictionary<string, ushort>
+                    {
+                        { "LowerTolerance", 2110 },
+                        { "UpperTolerance", 2111 },
+                        { "NominalValue", 2101 }
+                    };
 
-                SearchForMeasurements(client);
+                    Import(client, rawClient, "MyInspection", charcateristics, mapping);
+
+                    var parts = SearchForParts(client);
+
+                    var measurements = SearchForMeasurements(client, parts);
+
+                    GetProtocols(rawClient, measurements);
+                }
             }
         }
 
-        private static void SearchForMeasurements(DataServiceRestClient client)
+        private static IEnumerable<InspectionPlanPart> SearchForParts(DataServiceRestClient client)
+        {
+            //Filtering parts by attributes happen on client not on server side!!
+            var result = client.GetParts(
+                PathInformation.Root,                               // Part to be fetched by its path
+                new[] { Guid.NewGuid(), Guid.NewGuid() },               // Parts to be fetched by its uuids
+                1,                                                  // Determines how many levels of the inspection plan tree 
+                                                                    //hierarchy should be fetched. Setting depth=0 means that only the entity itself should be fetched, 
+                                                                    //depth=1 means the entity and its direct children should be fetched. Please note that depth is treated relative of the path depth of the provided part.
+                new AttributeSelector(AllAttributeSelection.True),  //Restricts the result to certain attributes
+                false                                               // Determines whether the version history should be fetched or not. This only effects the query if versioning is activated on the server side. 
+            ).Result;
+
+            return result;
+        }
+
+        private static void GetProtocols(RawDataServiceRestClient rawClient, SimpleMeasurement[] measurements)
+        {
+            //1. Fetch information about raw data values that exist for the given measurements
+            var informationList = new List<RawDataInformation>();
+            foreach (var measurement in measurements)
+            {
+                var target = RawDataTargetEntity.CreateForMeasurement(measurement.Uuid);
+                var rawDataInformation = rawClient.ListRawData(new[] { target }).Result;
+                informationList.AddRange(rawDataInformation);
+            }
+
+            //2. Fetch all the attached files and write it to the disk
+            string tempPath = @"C:\Temp\";
+            foreach (var info in informationList)
+            {
+                var bytes = rawClient.GetRawDataForMeasurement(new Guid(info.Target.Uuid), info.Key).Result;
+                System.IO.File.WriteAllBytes(string.Concat(tempPath, info.FileName), bytes);
+            }
+        }
+
+        private static SimpleMeasurement[] SearchForMeasurements(DataServiceRestClient client, IEnumerable<InspectionPlanPart> parts)
         {
             var result = client.GetMeasurements(
                 PathInformation.Root,                                              // Part where to search measurements 
@@ -84,7 +127,7 @@ namespace DemoProject
 					{
                         new Order( WellKnownKeys.Measurement.Time, OrderDirection.Asc, Entity.Measurement )
                     },
-                    PartUuids = new[] { Guid.NewGuid() },                           //Restrict the search to certain parts by its uuids
+                    PartUuids = parts.Select(p => p.Uuid).ToArray(),                //Restrict the search to certain parts by its uuids
                     RequestedMeasurementAttributes = null,                         // Specify, which measurement attributes should be returned (default: all)
                     SearchCondition = new GenericSearchAttributeCondition          // You can create more complex attribute conditions using the GenericSearchAnd, GenericSearchOr and GenericSearchNot class
                     {
@@ -93,9 +136,11 @@ namespace DemoProject
                         Value = XmlConvert.ToString(DateTime.UtcNow - TimeSpan.FromDays(2), XmlDateTimeSerializationMode.Utc)
                     }
                 }).Result;
+
+            return result;
         }
 
-        private static void Import(DataServiceRestClient client, string inspectionName, IEnumerable<Characteristic> data, Dictionary<string, ushort> mapping)
+        private static void Import(DataServiceRestClient client, RawDataServiceRestClient rawClient, string inspectionName, IEnumerable<Characteristic> data, Dictionary<string, ushort> mapping)
         {
             //1. Check server configuration
             foreach (var entry in mapping)
@@ -150,7 +195,6 @@ namespace DemoProject
             client.CreateMeasurementValues(new[] { measurement }).Wait();
 
             //4. Write the pdf file as addtional data to the measurement 
-            var rawClient = new RawDataServiceRestClient(_ServerUri);
             var byteData = System.IO.File.ReadAllBytes(@"C:\Temp\protocol.pdf");
             var target = RawDataTargetEntity.CreateForMeasurement(measurement.Uuid);
 
@@ -168,8 +212,6 @@ namespace DemoProject
                 Size = byteData.Length,
                 Target = target
             }, byteData).Wait();
-
-            var rawDataInformation = rawClient.ListRawData(new[] { target }).Result;
         }
     }
 }
