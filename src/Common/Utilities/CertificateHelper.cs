@@ -10,15 +10,13 @@
 
 namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 {
-	#region usings
+	
 
 	using System;
 	using System.Collections.Generic;
 	using System.Linq;
 	using System.Security.Cryptography;
 	using System.Security.Cryptography.X509Certificates;
-
-	#endregion
 
 	public static class CertificateHelper
 	{
@@ -173,10 +171,19 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 
 		public static X509Certificate2 SelectOneCertficate( IEnumerable<X509Certificate2> certificates, string title = null, string message = null, IntPtr? owner = null )
 		{
-			return SelectCertificates( certificates, title, message, X509SelectionFlag.SingleSelection, owner ).SingleOrDefault();
-		}
+#if NETSTANDARD2_0
+		    throw new NotSupportedException(".NET Standart 2.0 Not supported");
+#else
 
-		public static ICollection<X509Certificate2> SelectCertificates( IEnumerable<X509Certificate2> certificates, string title = null, string message = null, X509SelectionFlag selectionFlag = X509SelectionFlag.SingleSelection, IntPtr? owner = null )
+            return SelectCertificates( certificates, title, message, X509SelectionFlag.SingleSelection, owner ).SingleOrDefault();
+#endif
+        }
+
+#if NETSTANDARD2_0
+
+
+#else
+public static ICollection<X509Certificate2> SelectCertificates( IEnumerable<X509Certificate2> certificates, string title = null, string message = null, X509SelectionFlag selectionFlag = X509SelectionFlag.SingleSelection, IntPtr? owner = null )
 		{
 			if( certificates == null ) return new List<X509Certificate2>();
 
@@ -195,10 +202,16 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 			return result;
 		}
 
-		public static void ShowDetailsOfCertficate( X509Certificate2 certificate, IntPtr? owner = null )
+#endif
+
+#if NETSTANDARD2_0
+
+#else
+        public static void ShowDetailsOfCertficate( X509Certificate2 certificate, IntPtr? owner = null )
 		{
 			X509Certificate2UI.DisplayCertificate( certificate, owner ?? IntPtr.Zero );
 		}
+#endif
 
 		private static X509Certificate2Collection GetCertificatesFromStoreInternal( StoreName storeName = StoreName.My, StoreLocation storeLocation = StoreLocation.CurrentUser )
 		{
@@ -237,6 +250,6 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 			}
 		}
 
-		#endregion
+#endregion
 	}
 }

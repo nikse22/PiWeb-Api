@@ -8,6 +8,8 @@
 
 #endregion
 
+using System.IdentityModel.Tokens.Jwt;
+
 namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 {
 	#region usings
@@ -50,7 +52,7 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 
 		#endregion
 
-		#region methods
+		
 
 		public static JwtSecurityToken DecodeSecurityToken( string jwtEncodedString )
 		{
@@ -142,18 +144,41 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 
 				if( !tokenResponse.IsError )
 				{
-					// TODO: discover userinfo endpoint via ".well-known/openid-configuration"
-					var infoClient = new UserInfoClient( new Uri( authority + "/connect/userinfo" ), tokenResponse.AccessToken );
+#if NETSTANDARD2_0
+                    // TODO: discover userinfo endpoint via ".well-known/openid-configuration"
+                    var infoClient = new UserInfoClient(new Uri(authority + "/connect/userinfo").ToString());
+                    var userInfo = await infoClient.GetAsync(tokenResponse.AccessToken).ConfigureAwait(false);
+				    IEnumerable<Tuple<string, string>> castedClaims = TransformIt(userInfo.Claims);
+				    return OAuthTokenCredential.CreateWithClaims(castedClaims, tokenResponse.AccessToken, DateTime.UtcNow + TimeSpan.FromSeconds(tokenResponse.ExpiresIn), tokenResponse.RefreshToken);
+#else
+                    var infoClient = new UserInfoClient( new Uri( authority + "/connect/userinfo" ), tokenResponse.AccessToken );
 					var userInfo = await infoClient.GetAsync().ConfigureAwait( false );
+                    return OAuthTokenCredential.CreateWithClaims( userInfo.Claims, tokenResponse.AccessToken, DateTime.UtcNow + TimeSpan.FromSeconds( tokenResponse.ExpiresIn ), tokenResponse.RefreshToken );
+#endif
 
-					return OAuthTokenCredential.CreateWithClaims( userInfo.Claims, tokenResponse.AccessToken, DateTime.UtcNow + TimeSpan.FromSeconds( tokenResponse.ExpiresIn ), tokenResponse.RefreshToken );
-				}
+                }
 			}
 
 			return null;
 		}
 
-		private static async Task<OAuthTokenCredential> TryGetOAuthTokenFromAuthorizeResponseAsync( TokenClient tokenClient, CryptoNumbers cryptoNumbers, AuthorizeResponse response )
+#if NETSTANDARD2_0
+	    private static IEnumerable<Tuple<string, string>> TransformIt(IEnumerable<Claim> claims)
+	    {
+            //TODO has to be checked :)
+	        var tupleList = new List<Tuple<string, string>>();
+
+	        foreach (var claim in claims)
+	        {
+	            tupleList.Add(Tuple.Create(claim.Type,claim.Value));
+	        }
+
+	        return tupleList;
+
+	    }
+#endif
+
+        private static async Task<OAuthTokenCredential> TryGetOAuthTokenFromAuthorizeResponseAsync( TokenClient tokenClient, CryptoNumbers cryptoNumbers, AuthorizeResponse response )
 		{
 			if( response != null )
 			{
@@ -201,8 +226,9 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 
 		private static string CreateOAuthStartUrl( string authority, CryptoNumbers cryptoNumbers )
 		{
-			// FUTURE: discover authorize endpoint via ".well-known/openid-configuration"
-			var request = new AuthorizeRequest( authority + "/connect/authorize" );
+#if NETSTANDARD2_0
+// FUTURE: discover authorize endpoint via ".well-known/openid-configuration"
+			var request = new RequestUrl( authority + "/connect/authorize" );
 			return request.CreateAuthorizeUrl(
 				clientId: ClientId,
 				responseType: "id_token code",
@@ -213,6 +239,20 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 				nonce: cryptoNumbers.Nonce,
 				codeChallenge: cryptoNumbers.Challenge,
 				codeChallengeMethod: OidcConstants.CodeChallengeMethods.Sha256 );
+#else
+            // FUTURE: discover authorize endpoint via ".well-known/openid-configuration"
+		    var request = new AuthorizeRequest(authority + "/connect/authorize");
+		    return request.CreateAuthorizeUrl(
+                clientId: ClientId,
+				responseType: "id_token code",
+				responseMode: "form_post",
+				scope: "openid profile email offline_access piweb",
+				redirectUri: RedirectUri,
+				state: cryptoNumbers.State,
+				nonce: cryptoNumbers.Nonce,
+				codeChallenge: cryptoNumbers.Challenge,
+				codeChallengeMethod: OidcConstants.CodeChallengeMethods.Sha256 );
+#endif
 		}
 
 		private static async Task<string> CreateAuthorityAsync( string instanceUrl )
@@ -475,7 +515,7 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 			SerializeTokenCache();
 		}
 
-		#endregion
+
 
 		private class CryptoNumbers
 		{
@@ -484,8 +524,13 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Utilities
 				Nonce = CryptoRandom.CreateUniqueId(); // only default length of 16 as this is included in the access token which should small
 				State = CryptoRandom.CreateUniqueId( 32 );
 				Verifier = CryptoRandom.CreateUniqueId( 32 );
-				Challenge = Verifier.ToCodeChallenge();
-			}
+#if NETSTANDARD2_0
+		Challenge = Verifier.ToSha256();
+#else
+                Challenge = Verifier.ToCodeChallenge();
+#endif
+
+            }
 
 			public string Nonce { get; }
 			public string State { get; }

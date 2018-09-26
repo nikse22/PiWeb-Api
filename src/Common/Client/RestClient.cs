@@ -71,20 +71,33 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Client
 
 		[CanBeNull]
 		private readonly ILoginRequestHandler _LoginRequestHandler;
-		private readonly bool _Chunked = true;
+#if (NETSTANDARD2_0)
+private readonly bool _Chunked = false;
+#else
+	    private readonly bool _Chunked = true;
+#endif
 
 		private HttpClient _HttpClient;
-		private WebRequestHandler _WebRequestHandler;
+#if NETSTANDARD2_0
+		private HttpClientHandler _WebRequestHandler;
+#else
+	    private WebRequestHandler _WebRequestHandler;
+#endif
+        private AuthenticationContainer _AuthenticationContainer = new AuthenticationContainer( AuthenticationMode.NoneOrBasic );
 
-		private AuthenticationContainer _AuthenticationContainer = new AuthenticationContainer( AuthenticationMode.NoneOrBasic );
+        #endregion
 
-		#endregion
+        #region constructors
 
-		#region constructors
-
-		/// <summary>Constructor.</summary>
-		public RestClient( Uri serverUri, string endpointName, ILoginRequestHandler loginRequestHandler = null, TimeSpan? timeout = null, int maxUriLength = DefaultMaxUriLength, bool chunked = true )
+        /// <summary>Constructor.</summary>
+#if (NETSTANDARD2_0)
+public RestClient( Uri serverUri, string endpointName, ILoginRequestHandler loginRequestHandler = null, TimeSpan? timeout = null, int maxUriLength = DefaultMaxUriLength, bool chunked = false )
 		{
+#else
+        public RestClient(Uri serverUri, string endpointName, ILoginRequestHandler loginRequestHandler = null, TimeSpan? timeout = null, int maxUriLength = DefaultMaxUriLength, bool chunked = true)
+        {
+#endif
+           
 			if( serverUri == null )
 				throw new ArgumentNullException( nameof(serverUri) );
 
@@ -94,6 +107,7 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Client
 			}.Uri;
 
 			_LoginRequestHandler = loginRequestHandler;
+            
 			_Chunked = chunked;
 
 			MaxUriLength = maxUriLength;
@@ -101,15 +115,15 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Client
 			BuildHttpClient( timeout );
 		}
 
-		#endregion
+#endregion
 
-		#region properties
+#region properties
 
 		public int MaxUriLength { get; }
 
-		#endregion
+#endregion
 
-		#region methods
+#region methods
 
 		public Task Request( Func<HttpRequestMessage> requestCreationHandler, CancellationToken cancellationToken )
 		{
@@ -356,7 +370,30 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Client
 
 		private void BuildHttpClient( TimeSpan? timeout )
 		{
-			_WebRequestHandler = new WebRequestHandler
+#if NETSTANDARD2_0
+	    _WebRequestHandler = new HttpClientHandler()
+	    {
+	        //CachePolicy = new HttpRequestCachePolicy( HttpCacheAgeControl.MaxAge, TimeSpan.FromDays( 0 ) ),
+	        //AllowPipelining = true,
+	        PreAuthenticate = true,
+	        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+	        // PIWEB-8519
+	        // When using WindowsAuthentication, PiWeb Clients create lots of sockets in TIME_WAIT state.
+	        // During QDB export with RawData this may lead to exhaustion of ephemeral ports for new connections
+	        // resulting in exceptions.
+	        // The following assignment disables closing of the socket connection but has a few security
+	        // implications. After careful review I think these are not relevant for us currently.
+	        // Therefore it should be safe for us to switch this on.
+	        // Review:
+	        // - HttpWebRequest.ConnectionGroupName is set to a hash of the instance hash code
+	        // - PiWeb Clients do not do impersonation
+	        // - PiWeb Clients are using single sign on exclusively, which means no user B can hijack a connection of user A
+	        // - Inspecting Client/Server communication with Fiddler reveals that every request does a 401 roundtrip,
+	        //     i.e. the Server is already authenticating every single request
+	        //UnsafeAuthenticatedConnectionSharing = true
+	    };
+#else
+	    _WebRequestHandler = new WebRequestHandler
 			{
 				CachePolicy = new HttpRequestCachePolicy( HttpCacheAgeControl.MaxAge, TimeSpan.FromDays( 0 ) ),
 				AllowPipelining = true,
@@ -377,8 +414,11 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Client
 				//     i.e. the Server is already authenticating every single request
 				UnsafeAuthenticatedConnectionSharing = true
 			};
+#endif
 
-			_HttpClient = new HttpClient( _WebRequestHandler )
+
+
+        _HttpClient = new HttpClient( _WebRequestHandler )
 			{
 				Timeout = timeout ?? DefaultTimeout,
 				BaseAddress = ServiceLocation
@@ -490,9 +530,9 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Client
 			AuthenticationChanged?.Invoke( this, EventArgs.Empty );
 		}
 
-		#endregion
+#endregion
 
-		#region interface IRestClient
+#region interface IRestClient
 
 		/// <summary>
 		/// Gets or sets the request timeout.
@@ -554,6 +594,6 @@ namespace Zeiss.IMT.PiWeb.Api.Common.Client
 			_WebRequestHandler?.Dispose();
 		}
 
-		#endregion
+#endregion
 	}
 }
