@@ -1,113 +1,136 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
+using System.Xml;
 using Zeiss.IMT.PiWeb.Api.Common.Data;
 using Zeiss.IMT.PiWeb.Api.DataService.Rest;
+using Zeiss.IMT.PiWeb.Api.RawDataService.Rest;
 
 namespace DemoProject
 {
     class Program
     {
-
-        private static Uri _ServerUri = new Uri("http://localhost:8080/");
+        private static Uri _ServerUri = new Uri("http://DEDRSWH5LWQF2.izfmnet.zeiss.org:8080/");
 
         static void Main(string[] args)
         {
-
-            var characteristics = new List<Characteristic>
+            using (var client = new DataServiceRestClient(_ServerUri))
             {
-                new Characteristic
+
+                var charcateristics = new List<Characteristic>
                 {
-                    Name = "Char1",
-                    Value = 0.16,
-                    Attributes = new Dictionary<string, double>()
+                    new Characteristic
                     {
-                        {"LowerTolerance", -0.2},
-                        {"UpperTolerance", -0.2},
-                        {"NominalValue", -0.2}
+                        Name = "Char1",
+                        Value = 0.16,
+                        Attributes = new Dictionary<string, double>
+                        {
+                            { "LowerTolerance", -0.2 },
+                            { "UpperTolerance", 0.2 },
+                            { "NominalValue", 0.0 }
+                        }
+                    },
+                    new Characteristic
+                    {
+                        Name = "Char2",
+                        Value = 0.21,
+                        Attributes = new Dictionary<string, double>
+                        {
+                            { "LowerTolerance", -0.2 },
+                            { "UpperTolerance", 0.2 },
+                            { "NominalValue", 0.0 }
+                        }
+                    },
+                    new Characteristic
+                    {
+                        Name = "Char3",
+                        Value = 0.22,
+                        Attributes = new Dictionary<string, double>
+                        {
+                            { "LowerTolerance", -0.2 },
+                            { "UpperTolerance", 0.2 },
+                            { "NominalValue", 0.0 }
+                        }
                     }
+                };
 
-                },
-                new Characteristic
+                var mapping = new Dictionary<string, ushort>
                 {
-                    Name = "Char2",
-                    Value = 0.21,
-                    Attributes = new Dictionary<string, double>()
-                    {
-                        {"LowerTolerance", -0.4},
-                        {"UpperTolerance", -0.4},
-                        {"NominalValue", -0.4}
-                    }
+                    { "LowerTolerance", 2110 },
+                    { "UpperTolerance", 2111 },
+                    { "NominalValue", 2101 }
+                };
 
-                },
-                new Characteristic
-                {
-                    Name = "Char3",
-                    Value = 0.34,
-                    Attributes = new Dictionary<string, double>()
-                    {
-                        {"LowerTolerance", -0.3},
-                        {"UpperTolerance", -0.3},
-                        {"NominalValue", -0.3}
-                    }
+                Import(client, "MyInspection", charcateristics, mapping);
 
-                }
-            };
-
-            var mapping = new Dictionary<string, ushort>
-            {
-                {"LowerTolerance", 2110},
-                {"UpperTolerance", 2111},
-                {"NominalValue", 2101}
-            };
-
-            Import("MyInspection", characteristics, mapping);
-
+                SearchForMeasurements(client);
+            }
         }
 
-        private static void Import(string inspectionName, IEnumerable<Characteristic> data,
-            Dictionary<string, ushort> mapping)
+        private static void SearchForMeasurements(DataServiceRestClient client)
         {
-            // 1. create the client 
-            var client = new DataServiceRestClient(_ServerUri);
+            var result = client.GetMeasurements(
+                PathInformation.Root,                                              // Part where to search measurements 
+                new MeasurementFilterAttributes
+                {
+                    AggregationMeasurements = AggregationMeasurementSelection.All, // Decide how to include aggregated measurements in your query
+                    Deep = true,                                                   // A deep search will find measurements recursively below the start path
+                    FromModificationDate = null,                                   // Will only search measurements with a modification date (LastModified) newer than the specified one
+                    ToModificationDate = null,                                     // Will only search measurements with a modification date (LastModified) older than the specified one
+                    LimitResult = 10,                                              // Will limit the number of returned measurements
+                    MeasurementUuids = null,                                       // Use measurement uuids to search for specific measurements
+                    OrderBy = new[]                                                // Order the returned measurements by specific attributes
+					{
+                        new Order( WellKnownKeys.Measurement.Time, OrderDirection.Asc, Entity.Measurement )
+                    },
+                    PartUuids = new[] { Guid.NewGuid() },                           //Restrict the search to certain parts by its uuids
+                    RequestedMeasurementAttributes = null,                         // Specify, which measurement attributes should be returned (default: all)
+                    SearchCondition = new GenericSearchAttributeCondition          // You can create more complex attribute conditions using the GenericSearchAnd, GenericSearchOr and GenericSearchNot class
+                    {
+                        Attribute = WellKnownKeys.Measurement.Time,                //Only measurement attributes are supported
+                        Operation = Operation.GreaterThan,
+                        Value = XmlConvert.ToString(DateTime.UtcNow - TimeSpan.FromDays(2), XmlDateTimeSerializationMode.Utc)
+                    }
+                }).Result;
+        }
 
-
-            // 2. check server configuration
+        private static void Import(DataServiceRestClient client, string inspectionName, IEnumerable<Characteristic> data, Dictionary<string, ushort> mapping)
+        {
+            //1. Check server configuration
             foreach (var entry in mapping)
             {
-                Configuration.CheckAttribute(client, Entity.Characteristic, entry.Value, entry.Key,
-                    AttributeType.Float);
+                Configuration.CheckAttribute(client, Entity.Characteristic, entry.Value, entry.Key, AttributeType.Float);
             }
 
-            // Make sure that essential attributes do exist
+            //1.1 Make sure that essential attributes Time(4) and Value(1) do exist
             Configuration.CheckAttribute(client, Entity.Measurement, WellKnownKeys.Measurement.Time, "Time", AttributeType.DateTime);
-            Configuration.CheckAttribute(client, Entity.Value, WellKnownKeys.Measurement.Time, "Value", AttributeType.Float);
+            Configuration.CheckAttribute(client, Entity.Value, WellKnownKeys.Value.MeasuredValue, "Value", AttributeType.Float);
 
+            //2. Check the inspection plan
 
-            // 3. check inspection plan
+            //2.1 Check the part
             var part = InspectionPlan.GetOrCreatePart(client, inspectionName);
+
+            //2.2 Check the characteristics
             var characteristicMapping = new Dictionary<Characteristic, InspectionPlanCharacteristic>();
 
             foreach (var characteristic in data)
             {
                 var inspectionPlanCharacteristic = InspectionPlan.GetOrCreateCharacteristic(client, part.Path.Name,
-                    characteristic.Name, mapping, characteristic.Attributes);
+                                                   characteristic.Name, mapping, characteristic.Attributes);
                 characteristicMapping.Add(characteristic, inspectionPlanCharacteristic);
             }
 
-            // 4. create measurements
-            var dataCharacteristics = characteristicMapping.Select(pair => new DataCharacteristic
+            //3. Create measurements
+            var datacharcateristics = characteristicMapping.Select(pair => new DataCharacteristic
             {
                 Uuid = pair.Value.Uuid,
                 Path = pair.Value.Path,
                 Value = new DataValue
                 {
-                    Attributes = new[]
-                    {
-                        new Zeiss.IMT.PiWeb.Api.DataService.Rest.Attribute(WellKnownKeys.Value.MeasuredValue, pair.Key.Value),
-                    }
+                    Attributes = new[] {
+                        new Zeiss.IMT.PiWeb.Api.DataService.Rest.Attribute( WellKnownKeys.Value.MeasuredValue, pair.Key.Value ) }
                 }
             }).ToArray();
 
@@ -118,14 +141,35 @@ namespace DemoProject
                 Time = DateTime.UtcNow,
                 Attributes = new[]
                 {
-                    new Zeiss.IMT.PiWeb.Api.DataService.Rest.Attribute(WellKnownKeys.Measurement.Time, DateTime.UtcNow)
+                    new Zeiss.IMT.PiWeb.Api.DataService.Rest.Attribute( WellKnownKeys.Measurement.Time, DateTime.UtcNow )
                 },
-                Characteristics = dataCharacteristics
+                Characteristics = datacharcateristics
             };
 
-            // 4.1. finally we write measurement to database
+            //3.1 Finally write measurement to database
+            client.CreateMeasurementValues(new[] { measurement }).Wait();
+
+            //4. Write the pdf file as addtional data to the measurement 
+            var rawClient = new RawDataServiceRestClient(_ServerUri);
+            var byteData = System.IO.File.ReadAllBytes(@"C:\Temp\protocol.pdf");
+            var target = RawDataTargetEntity.CreateForMeasurement(measurement.Uuid);
+
+            //Notes:	- see e.g. http://wiki.selfhtml.org/wiki/Referenz:MIME-Typen for a complete list of mime types
+            //			- When using Key = -1, the server will generate a new key
+
+            rawClient.CreateRawData(new RawDataInformation
+            {
+                FileName = "Protocol.pdf",
+                MimeType = "application/pdf",
+                Key = -1,
+                Created = DateTime.Now,
+                LastModified = DateTime.Now,
+                MD5 = new Guid(MD5.Create().ComputeHash(byteData)),
+                Size = byteData.Length,
+                Target = target
+            }, byteData).Wait();
+
+            var rawDataInformation = rawClient.ListRawData(new[] { target }).Result;
         }
-
     }
-
 }
