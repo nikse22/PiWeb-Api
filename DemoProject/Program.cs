@@ -88,8 +88,8 @@ namespace DemoProject
         {
             //1. Fetch information about raw data values that exist for the given measurements
             var informationList = new List<RawDataInformation>();
-            
-            var rawDataInformations = rawClient.ListRawData(RawDataEntity.Measurement, measurements.Select(p => p.Uuid.ToString()).ToArray(), null).Result;
+
+            var rawDataInformations = rawClient.ListRawDataForMeasurements(measurements.Select(p => p.Uuid).ToArray()).Result;
             informationList.AddRange(rawDataInformations);
 
             //2. Fetch all the attached files and write it to the disk
